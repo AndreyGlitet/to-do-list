@@ -6,6 +6,7 @@
     "globals": "^17.6.0"
   },
   "scripts": {
-    "lint": "eslint ."
+    "lint": "eslint .",
+     "start": "node backend/server.js"
   }
 }
