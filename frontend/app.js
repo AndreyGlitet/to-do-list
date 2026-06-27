@@ -10,13 +10,12 @@ async function fetchTasks() {
     renderTasks(tasks);
   } catch (error) {
     console.error('Ошибка:', error);
-    todoList.innerHTML = '<p style="color: red;">Ошибка подключения к бэкенду</p>';
+    todoList.innerHTML = '<p class="loading" style="color: #ff7c7c;">Ошибка подключения к бэкенду</p>';
   }
 }
 
-// 2. Отправка новой задачи на бэкенд
 async function addTask(event) {
-  event.preventDefault(); 
+  event.preventDefault();
 
   const title = taskInput.value.trim();
   if (!title) return;
@@ -31,8 +30,10 @@ async function addTask(event) {
     });
 
     if (response.ok) {
-      taskInput.value = ''; 
-      await fetchTasks();   
+      taskInput.value = '';
+      await fetchTasks();
+    } else {
+      alert('Не удалось добавить задачу');
     }
   } catch (error) {
     console.error('Ошибка добавления задачи:', error);
@@ -40,28 +41,88 @@ async function addTask(event) {
   }
 }
 
+async function toggleTask(id, currentStatus) {
+  try {
+    const response = await fetch(`${API_URL}/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ completed: !currentStatus })
+    });
+
+    if (response.ok) {
+      await fetchTasks();
+    } else {
+      alert('Не удалось обновить статус');
+    }
+  } catch (error) {
+    console.error('Ошибка обновления:', error);
+    alert('Не удалось обновить статус');
+  }
+}
+
+async function deleteTask(id) {
+  if (!confirm('Удалить задачу?')) return;
+
+  try {
+    const response = await fetch(`${API_URL}/${id}`, {
+      method: 'DELETE'
+    });
+
+    if (response.ok) {
+      await fetchTasks();
+    } else {
+      alert('Не удалось удалить задачу');
+    }
+  } catch (error) {
+    console.error('Ошибка удаления:', error);
+    alert('Не удалось удалить задачу');
+  }
+}
 
 function renderTasks(tasks) {
   todoList.innerHTML = '';
 
   if (tasks.length === 0) {
-    todoList.innerHTML = '<p>Задач пока нет</p>';
+    todoList.innerHTML = `
+      <div class="empty-message">
+        <span class="icon">📋</span>
+        <span>Задач пока нет</span>
+      </div>
+    `;
     return;
   }
 
   tasks.forEach(task => {
     const taskEl = document.createElement('div');
     taskEl.className = 'task-item';
-    
-    taskEl.innerHTML = `
-      <span class="${task.completed ? 'completed' : ''}">${task.title}</span>
-      <input type="checkbox" ${task.completed ? 'checked' : ''} disabled>
-    `;
-    
+
+    const titleSpan = document.createElement('span');
+    titleSpan.className = `task-title ${task.completed ? 'completed' : ''}`;
+    titleSpan.textContent = task.title;
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'task-actions';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = `btn-toggle ${task.completed ? 'done' : ''}`;
+    toggleBtn.textContent = task.completed ? '✅ Готово' : '⬜ В процессе';
+    toggleBtn.addEventListener('click', () => toggleTask(task.id, task.completed));
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn-delete';
+    deleteBtn.textContent = '🗑 Удалить';
+    deleteBtn.addEventListener('click', () => deleteTask(task.id));
+
+    actionsDiv.appendChild(toggleBtn);
+    actionsDiv.appendChild(deleteBtn);
+
+    taskEl.appendChild(titleSpan);
+    taskEl.appendChild(actionsDiv);
     todoList.appendChild(taskEl);
   });
 }
-
 
 taskForm.addEventListener('submit', addTask);
 
