@@ -3,24 +3,28 @@ import cors from 'cors';
 import pg from 'pg';
 import dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-dotenv.config({ path: path.resolve(process.cwd(), 'backend/.env') });
+// Для ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config(); 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('frontend'));
+app.use(express.static(path.join(__dirname, 'frontend'))); // Фикс пути
+
 
 const pool = new pg.Pool({
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME,
-  ssl: { rejectUnauthorized: false } // Защита для облачных БД
+  connectionString: process.env.SUPABASE_DB_URL, 
+  ssl: { rejectUnauthorized: false }
 });
+
 async function initDB() {
   try {
     await pool.query(`
@@ -30,25 +34,23 @@ async function initDB() {
         completed BOOLEAN DEFAULT false
       );
     `);
-    console.log('🚀 Успешное подключение к Supabase PostgreSQL и проверка таблиц');
+    console.log('🚀 Успешное подключение к Supabase PostgreSQL');
   } catch (err) {
-    console.error('❌ Ошибка инициализации базы данных:', err);
+    console.error('❌ Ошибка инициализации БД:', err);
   }
 }
 initDB();
 
-// GET: Получение задач из реальной БД
 app.get('/api/tasks', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM tasks ORDER BY id ASC');
     res.json(result.rows);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Ошибка при получении задач из БД' });
+    res.status(500).json({ error: 'Ошибка при получении задач' });
   }
 });
 
-// POST: Добавление задачи в реальную БД
 app.post('/api/tasks', async (req, res) => {
   try {
     const { title } = req.body;
@@ -58,13 +60,13 @@ app.post('/api/tasks', async (req, res) => {
       'INSERT INTO tasks (title) VALUES ($1) RETURNING *',
       [title]
     );
-    res.status(201).json(result.rows[0]); // Возвращаем созданную задачу
+    res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Ошибка при добавлении задачи в БД' });
+    res.status(500).json({ error: 'Ошибка при добавлении задачи' });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Сервер успешно запущен на порту ${PORT}`);
+  console.log(`✅ Сервер запущен на порту ${PORT}`);
 });
