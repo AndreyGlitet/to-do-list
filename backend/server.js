@@ -19,7 +19,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 const pool = new pg.Pool({
-  connectionString: process.env.SUPABASE_DB_URL,
+  connectionString: 'postgresql://postgres.uqypopswwivppwbdsfzq:0954adA_Av%40@aws-0-eu-west-1.pooler.supabase.com:6543/postgres',
   ssl: { rejectUnauthorized: false }
 });
 
