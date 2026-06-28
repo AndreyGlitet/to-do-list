@@ -33,10 +33,19 @@ async function initDB() {
       );
     `);
     console.log('🚀 Успешное подключение к Supabase PostgreSQL');
+    
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Сервер запущен на порту ${PORT}`);
+    });
+
   } catch (err) {
     console.error('❌ Ошибка инициализации БД:', err);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`⚠️ Сервер запущен в аварийном режиме на порту ${PORT}`);
+    });
   }
 }
+
 initDB();
 
 app.get('/api/tasks', async (req, res) => {
