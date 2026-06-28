@@ -9,7 +9,7 @@ import { dirname } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -19,7 +19,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 const pool = new pg.Pool({
-  connectionString: 'postgresql://postgres.uqypopswwivppwbdsfzq:0954adA_Av%40@aws-0-eu-west-1.pooler.supabase.com:6543/postgres',
+  connectionString: process.env.SUPABASE_DB_URL,
   ssl: { rejectUnauthorized: false }
 });
 
@@ -33,20 +33,10 @@ async function initDB() {
       );
     `);
     console.log('🚀 Успешное подключение к Supabase PostgreSQL');
-    
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`✅ Сервер запущен на порту ${PORT}`);
-    });
-
   } catch (err) {
     console.error('❌ Ошибка инициализации БД:', err);
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`⚠️ Сервер запущен в аварийном режиме на порту ${PORT}`);
-    });
   }
 }
-
-initDB();
 
 app.get('/api/tasks', async (req, res) => {
   try {
@@ -115,6 +105,13 @@ app.delete('/api/tasks/:id', async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Сервер запущен на порту ${PORT}`);
+// СНАЧАЛА инициализируем БД, ПОТОМ запускаем сервер
+initDB().then(() => {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ Сервер запущен на порту ${PORT}`);
+    console.log(`🌐 Открой: http://localhost:${PORT}`);
+  });
+}).catch((err) => {
+  console.error('❌ Критическая ошибка:', err);
+  process.exit(1);
 });
