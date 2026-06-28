@@ -1,141 +1,111 @@
-const API_URL = 'http://localhost:3000/api/tasks';
-const todoList = document.getElementById('todo-list');
-const taskForm = document.getElementById('task-form');
-const taskInput = document.getElementById('task-input');
+import express from 'express';
+import cors from 'cors';
+import pg from 'pg';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-async function fetchTasks() {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
+
+const pool = new pg.Pool({
+  connectionString: process.env.SUPABASE_DB_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+async function initDB() {
   try {
-    const response = await fetch(API_URL);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const tasks = await response.json();
-    
-    if (!Array.isArray(tasks)) {
-      console.error('Ответ не является массивом:', tasks);
-      todoList.innerHTML = '<p class="loading" style="color: #ff7c7c;">Ошибка: сервер вернул некорректные данные</p>';
-      return;
-    }
-    
-    renderTasks(tasks);
-  } catch (error) {
-    console.error('Ошибка загрузки:', error);
-    todoList.innerHTML = '<p class="loading" style="color: #ff7c7c;">❌ Ошибка подключения к бэкенду</p>';
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS tasks (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        completed BOOLEAN DEFAULT false
+      );
+    `);
+    console.log('🚀 Успешное подключение к Supabase PostgreSQL');
+  } catch (err) {
+    console.error('❌ Ошибка инициализации БД:', err);
   }
 }
+initDB();
 
-async function addTask(event) {
-  event.preventDefault();
-
-  const title = taskInput.value.trim();
-  if (!title) return;
-
+app.get('/api/tasks', async (req, res) => {
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ title })
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    taskInput.value = '';
-    await fetchTasks();
+    const result = await pool.query('SELECT * FROM tasks ORDER BY id ASC');
+    res.json(result.rows);
   } catch (error) {
-    console.error('Ошибка добавления задачи:', error);
-    alert('❌ Не удалось добавить задачу');
+    console.error(error);
+    res.status(500).json({ error: 'Ошибка при получении задач' });
   }
-}
+});
 
-async function toggleTask(id, currentStatus) {
+app.post('/api/tasks', async (req, res) => {
   try {
-    const response = await fetch(`${API_URL}/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ completed: !currentStatus })
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    await fetchTasks();
+    const { title } = req.body;
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+    
+    const result = await pool.query(
+      'INSERT INTO tasks (title) VALUES ($1) RETURNING *',
+      [title]
+    );
+    res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Ошибка обновления:', error);
-    alert('❌ Не удалось обновить статус');
+    console.error(error);
+    res.status(500).json({ error: 'Ошибка при добавлении задачи' });
   }
-}
+});
 
-async function deleteTask(id) {
-  if (!confirm('🗑 Удалить задачу?')) return;
-
+app.put('/api/tasks/:id', async (req, res) => {
   try {
-    const response = await fetch(`${API_URL}/${id}`, {
-      method: 'DELETE'
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    const { id } = req.params;
+    const { completed } = req.body;
+    
+    const result = await pool.query(
+      'UPDATE tasks SET completed = $1 WHERE id = $2 RETURNING *',
+      [completed, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Задача не найдена' });
     }
-
-    await fetchTasks();
+    
+    res.json(result.rows[0]);
   } catch (error) {
-    console.error('Ошибка удаления:', error);
-    alert('❌ Не удалось удалить задачу');
+    console.error(error);
+    res.status(500).json({ error: 'Ошибка обновления задачи' });
   }
-}
+});
 
-function renderTasks(tasks) {
-  todoList.innerHTML = '';
-
-  if (!tasks || tasks.length === 0) {
-    todoList.innerHTML = `
-      <div class="empty-message">
-        <span class="icon">📋</span>
-        <span>Задач пока нет</span>
-      </div>
-    `;
-    return;
+app.delete('/api/tasks/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'DELETE FROM tasks WHERE id = $1 RETURNING *',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Задача не найдена' });
+    }
+    
+    res.json({ message: 'Задача удалена' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Ошибка удаления задачи' });
   }
+});
 
-  tasks.forEach(task => {
-    const taskEl = document.createElement('div');
-    taskEl.className = 'task-item';
-
-    const titleSpan = document.createElement('span');
-    titleSpan.className = `task-title ${task.completed ? 'completed' : ''}`;
-    titleSpan.textContent = task.title;
-
-    const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'task-actions';
-
-    const toggleBtn = document.createElement('button');
-    toggleBtn.className = `btn-toggle ${task.completed ? 'done' : ''}`;
-    toggleBtn.textContent = task.completed ? '✅ Готово' : '⬜ В процессе';
-    toggleBtn.addEventListener('click', () => toggleTask(task.id, task.completed));
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn-delete';
-    deleteBtn.textContent = '🗑 Удалить';
-    deleteBtn.addEventListener('click', () => deleteTask(task.id));
-
-    actionsDiv.appendChild(toggleBtn);
-    actionsDiv.appendChild(deleteBtn);
-
-    taskEl.appendChild(titleSpan);
-    taskEl.appendChild(actionsDiv);
-    todoList.appendChild(taskEl);
-  });
-}
-
-taskForm.addEventListener('submit', addTask);
-
-fetchTasks();
+app.listen(PORT, () => {
+  console.log(`✅ Сервер запущен на порту ${PORT}`);
+});
