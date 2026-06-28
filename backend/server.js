@@ -32,9 +32,10 @@ pool.connect((err, client, release) => {
   }
 });
 
+// 1. ИЗМЕНЕНО: Сортировка сначала по важности (DESC — true выше false), затем по id
 app.get('/api/tasks', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM tasks ORDER BY id ASC');
+    const result = await pool.query('SELECT * FROM tasks ORDER BY is_important DESC, id ASC');
     res.json(result.rows);
   } catch (error) {
     console.error(' Ошибка GET /api/tasks:', error.message);
@@ -42,14 +43,17 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
+// 2. ИЗМЕНЕНО: Добавлено поле is_important при создании (по умолчанию false, если не передано)
 app.post('/api/tasks', async (req, res) => {
   try {
-    const { title } = req.body;
+    const { title, is_important } = req.body;
     if (!title) return res.status(400).json({ error: 'Title is required' });
     
+    const importance = is_important || false;
+    
     const result = await pool.query(
-      'INSERT INTO tasks (title) VALUES ($1) RETURNING *',
-      [title]
+      'INSERT INTO tasks (title, is_important) VALUES ($1, $2) RETURNING *',
+      [title, importance]
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -58,19 +62,25 @@ app.post('/api/tasks', async (req, res) => {
   }
 });
 
+// 3. ИЗМЕНЕНО: Обновление динамически принимает и completed, и is_important
 app.put('/api/tasks/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { completed } = req.body;
+    const { completed, is_important } = req.body;
     
-    const result = await pool.query(
-      'UPDATE tasks SET completed = $1 WHERE id = $2 RETURNING *',
-      [completed, id]
-    );
-    
-    if (result.rows.length === 0) {
+    // Получаем текущие данные задачи, чтобы не затереть их, если пришло только одно поле
+    const currentTask = await pool.query('SELECT * FROM tasks WHERE id = $1', [id]);
+    if (currentTask.rows.length === 0) {
       return res.status(404).json({ error: 'Задача не найдена' });
     }
+
+    const updatedCompleted = completed !== undefined ? completed : currentTask.rows[0].completed;
+    const updatedImportant = is_important !== undefined ? is_important : currentTask.rows[0].is_important;
+    
+    const result = await pool.query(
+      'UPDATE tasks SET completed = $1, is_important = $2 WHERE id = $3 RETURNING *',
+      [updatedCompleted, updatedImportant, id]
+    );
     
     res.json(result.rows[0]);
   } catch (error) {
@@ -103,3 +113,4 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(` Сервер запущен на порту ${PORT}`);
   console.log(` Открой: http://localhost:${PORT}`);
 });
+
