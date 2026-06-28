@@ -4,10 +4,9 @@ import pg from 'pg';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -23,28 +22,23 @@ const pool = new pg.Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-async function initDB() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id SERIAL PRIMARY KEY,
-        title TEXT NOT NULL,
-        completed BOOLEAN DEFAULT false
-      );
-    `);
-    console.log('🚀 Успешное подключение к Supabase PostgreSQL');
-  } catch (err) {
-    console.error('❌ Ошибка инициализации БД:', err);
+// ПРОВЕРКА ПОДКЛЮЧЕНИЯ ПРЯМО СЕЙЧАС
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error(' ОШИБКА ПОДКЛЮЧЕНИЯ К БД:', err.message);
+  } else {
+    console.log(' БД ПОДКЛЮЧЕНА!');
+    release();
   }
-}
+});
 
 app.get('/api/tasks', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM tasks ORDER BY id ASC');
     res.json(result.rows);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Ошибка при получении задач' });
+    console.error(' Ошибка GET /api/tasks:', error.message);
+    res.status(500).json({ error: 'Ошибка при получении задач: ' + error.message });
   }
 });
 
@@ -59,8 +53,8 @@ app.post('/api/tasks', async (req, res) => {
     );
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Ошибка при добавлении задачи' });
+    console.error(' Ошибка POST /api/tasks:', error.message);
+    res.status(500).json({ error: 'Ошибка при добавлении задачи: ' + error.message });
   }
 });
 
@@ -80,8 +74,8 @@ app.put('/api/tasks/:id', async (req, res) => {
     
     res.json(result.rows[0]);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Ошибка обновления задачи' });
+    console.error(' Ошибка PUT /api/tasks:', error.message);
+    res.status(500).json({ error: 'Ошибка обновления задачи: ' + error.message });
   }
 });
 
@@ -100,18 +94,12 @@ app.delete('/api/tasks/:id', async (req, res) => {
     
     res.json({ message: 'Задача удалена' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Ошибка удаления задачи' });
+    console.error(' Ошибка DELETE /api/tasks:', error.message);
+    res.status(500).json({ error: 'Ошибка удаления задачи: ' + error.message });
   }
 });
 
-// СНАЧАЛА инициализируем БД, ПОТОМ запускаем сервер
-initDB().then(() => {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ Сервер запущен на порту ${PORT}`);
-    console.log(`🌐 Открой: http://localhost:${PORT}`);
-  });
-}).catch((err) => {
-  console.error('❌ Критическая ошибка:', err);
-  process.exit(1);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(` Сервер запущен на порту ${PORT}`);
+  console.log(` Открой: http://localhost:${PORT}`);
 });
