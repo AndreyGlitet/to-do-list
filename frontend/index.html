@@ -15,6 +15,12 @@
       <input type="text" id="task-input" placeholder="Что нужно сделать?" required>
       <button type="submit">Добавить</button>
     </form>
+
+    <div class="filter-buttons">
+      <button type="button" id="filter-all" class="filter-btn active">Все</button>
+      <button type="button" id="filter-active" class="filter-btn">Активные</button>
+      <button type="button" id="filter-completed" class="filter-btn">Выполненные</button>
+    </div>
     
     <div id="todo-list">
       <p class="loading">Загрузка задач из бэкенда...</p>

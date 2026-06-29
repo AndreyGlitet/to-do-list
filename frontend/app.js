@@ -3,15 +3,32 @@ const todoList = document.getElementById('todo-list');
 const taskForm = document.getElementById('task-form');
 const taskInput = document.getElementById('task-input');
 
+// ИЗМЕНЕНО: Добавили глобальные переменные для управления фильтрами
+let allTasks = []; 
+let currentFilter = 'all'; // Возможные значения: 'all', 'active', 'completed'
+
 async function fetchTasks() {
   try {
     const response = await fetch(API_URL);
-    const tasks = await response.json();
-    renderTasks(tasks);
+    allTasks = await response.json(); // ИЗМЕНЕНО: Запоминаем все задачи в глобальный массив
+    applyFilter();                    // ИЗМЕНЕНО: Вместо прямого рендера применяем текущий фильтр
   } catch (error) {
     console.error('Ошибка:', error);
     todoList.innerHTML = '<p class="loading" style="color: #ff7c7c;">Ошибка подключения к бэкенду</p>';
   }
+}
+
+// ИЗМЕНЕНО: Новая функция для фильтрации массива перед выводом на экран
+function applyFilter() {
+  let filteredTasks = allTasks;
+
+  if (currentFilter === 'active') {
+    filteredTasks = allTasks.filter(task => !task.completed);  // Только невыполненные
+  } else if (currentFilter === 'completed') {
+    filteredTasks = allTasks.filter(task => task.completed);   // Только выполненные
+  }
+
+  renderTasks(filteredTasks);
 }
 
 async function addTask(event) {
@@ -62,7 +79,6 @@ async function toggleTask(id, currentStatus) {
   }
 }
 
-// Переключение маркера важности
 async function toggleUrgent(id, currentUrgentStatus) {
   try {
     const response = await fetch(`${API_URL}/${id}`, {
@@ -118,7 +134,6 @@ function renderTasks(tasks) {
 
   tasks.forEach(task => {
     const taskEl = document.createElement('div');
-    // Добавляем класс 'urgent-task', если задача важная
     taskEl.className = `task-item ${task.is_important ? 'urgent-task' : ''}`;
 
     const titleSpan = document.createElement('span');
@@ -128,19 +143,16 @@ function renderTasks(tasks) {
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'task-actions';
 
-    // Кнопка статуса
     const toggleBtn = document.createElement('button');
     toggleBtn.className = `btn-toggle ${task.completed ? 'done' : ''}`;
     toggleBtn.textContent = task.completed ? '✅ Готово' : '⬜ В процессе';
     toggleBtn.addEventListener('click', () => toggleTask(task.id, task.completed));
 
-    // Кнопка важности (добавляем класс 'active', если true)
     const urgentBtn = document.createElement('button');
     urgentBtn.className = `btn-urgent ${task.is_important ? 'active' : ''}`;
     urgentBtn.textContent = task.is_important ? '⭐ Важно!' : '☆ Важная';
     urgentBtn.addEventListener('click', () => toggleUrgent(task.id, task.is_important));
 
-    // Кнопка удаления
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'btn-delete';
     deleteBtn.textContent = '🗑 Удалить';
@@ -154,6 +166,31 @@ function renderTasks(tasks) {
     taskEl.appendChild(actionsDiv);
     todoList.appendChild(taskEl);
   });
+}
+
+
+document.getElementById('filter-all').addEventListener('click', (e) => {
+  switchActiveFilterButton(e.target);
+  currentFilter = 'all';
+  applyFilter();
+});
+
+document.getElementById('filter-active').addEventListener('click', (e) => {
+  switchActiveFilterButton(e.target);
+  currentFilter = 'active';
+  applyFilter();
+});
+
+document.getElementById('filter-completed').addEventListener('click', (e) => {
+  switchActiveFilterButton(e.target);
+  currentFilter = 'completed';
+  applyFilter();
+});
+
+
+function switchActiveFilterButton(clickedButton) {
+  document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+  clickedButton.classList.add('active');
 }
 
 taskForm.addEventListener('submit', addTask);
