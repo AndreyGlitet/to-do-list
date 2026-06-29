@@ -10,8 +10,7 @@ export const getTasks = async (req, res) => {
   }
 };
 
-
-export const createTask = async (req, res) => { 
+export const createTask = async (req, res) => {
   try {
     const { title, is_important } = req.body;
     if (!title) return res.status(400).json({ error: 'Title is required' });
@@ -22,7 +21,7 @@ export const createTask = async (req, res) => {
       'INSERT INTO tasks (title, is_important) VALUES ($1, $2) RETURNING *',
       [title, importance]
     );
-    res.status(201).json(result.rows[0]); 
+    res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error(' Ошибка POST /api/tasks:', error.message);
     res.status(500).json({ error: 'Ошибка при добавлении задачи: ' + error.message });
@@ -51,5 +50,25 @@ export const updateTask = async (req, res) => {
   } catch (error) {
     console.error(' Ошибка PUT /api/tasks:', error.message);
     res.status(500).json({ error: 'Ошибка обновления задачи: ' + error.message });
+  }
+};
+
+export const deleteTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'DELETE FROM tasks WHERE id = $1 RETURNING *',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Задача не найдена' });
+    }
+    
+    res.json({ message: 'Задача удалена' });
+  } catch (error) {
+    console.error(' Ошибка DELETE /api/tasks:', error.message);
+    res.status(500).json({ error: 'Ошибка удаления задачи: ' + error.message });
   }
 };

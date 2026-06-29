@@ -15,7 +15,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(pathModule.join(__dirname, '..', 'frontend')));
 
-// Подключаем наши маршруты для задач
 app.use('/api/tasks', taskRoutes);
 
 app.listen(PORT, '0.0.0.0', () => {
